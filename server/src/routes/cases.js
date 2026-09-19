@@ -137,4 +137,68 @@ router.get('/:id', authenticate, (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/cases/:id
+ * Update case title/description (owner only).
+ */
+router.patch('/:id', authenticate, requireOfficer, (req, res) => {
+  try {
+    const { title, description } = req.body;
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    const caseData = queryOne('SELECT * FROM cases WHERE id = ?', [req.params.id]);
+    if (!caseData) return res.status(404).json({ error: 'Case not found' });
+    if (caseData.created_by !== req.user.id) return res.status(403).json({ error: 'Unauthorized' });
+
+    runSql('UPDATE cases SET title = ?, description = ? WHERE id = ?', [title, description || '', req.params.id]);
+    
+    createAuditLog({
+      userId: req.user.id,
+      action: 'CASE_UPDATED',
+      entityType: 'CASE',
+      entityId: caseData.id,
+      details: `Updated case details for ${caseData.case_number}`,
+      ipAddress: req.ip,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[CASES] Update error:', err);
+    res.status(500).json({ error: 'Failed to update case' });
+  }
+});
+
+/**
+ * PATCH /api/cases/:id/status
+ * Update case status (owner only).
+ */
+router.patch('/:id/status', authenticate, requireOfficer, (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['OPEN', 'CLOSED', 'ARCHIVED'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const caseData = queryOne('SELECT * FROM cases WHERE id = ?', [req.params.id]);
+    if (!caseData) return res.status(404).json({ error: 'Case not found' });
+    if (caseData.created_by !== req.user.id) return res.status(403).json({ error: 'Unauthorized' });
+
+    runSql('UPDATE cases SET status = ? WHERE id = ?', [status, req.params.id]);
+    
+    createAuditLog({
+      userId: req.user.id,
+      action: 'CASE_STATUS_CHANGED',
+      entityType: 'CASE',
+      entityId: caseData.id,
+      details: `Changed case ${caseData.case_number} status to ${status}`,
+      ipAddress: req.ip,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[CASES] Status update error:', err);
+    res.status(500).json({ error: 'Failed to update case status' });
+  }
+});
+
 module.exports = router;

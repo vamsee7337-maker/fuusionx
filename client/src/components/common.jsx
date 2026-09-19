@@ -7,6 +7,7 @@ export function StatusBadge({ status }) {
     TAMPER_DETECTED: 'bg-red-500/20 text-red-400 border-red-500/30',
     OPEN: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     CLOSED: 'bg-dark-500/20 text-dark-400 border-dark-500/30',
+    ARCHIVED: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
     ENCRYPTED: 'bg-primary-500/20 text-primary-400 border-primary-500/30',
     ACTIVE: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   };
