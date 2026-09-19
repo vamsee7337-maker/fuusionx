@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const path = require('path');
 const { initDatabase, initSchema, getDb, queryOne } = require('./db/schema');
 const { seed } = require('./db/seed');
 
@@ -45,6 +46,14 @@ app.use('/api/cases', require('./routes/cases'));
 app.use('/api/evidence', require('./routes/evidence'));
 app.use('/api/audit', require('./routes/audit'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+
+// --- Static Frontend Serving ---
+const clientBuildPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientBuildPath));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
 
 // --- Error handling ---
 app.use((err, req, res, next) => {
