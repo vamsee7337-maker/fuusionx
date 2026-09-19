@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
-const { initDatabase, initSchema, getDb, queryOne } = require('./db/schema');
+const { initDatabase, initSchema, getDb, queryOne, closeDb } = require('./db/schema');
 const { seed } = require('./db/seed');
 
 const app = express();
@@ -82,6 +82,17 @@ async function start() {
       console.log(`[SERVER] DigiProtect backend running on http://localhost:${PORT}`);
       console.log(`[SERVER] Health check: http://localhost:${PORT}/api/health`);
     });
+
+    // Graceful shutdown handling
+    const shutdown = () => {
+      console.log('\n[SERVER] Shutting down gracefully...');
+      closeDb();
+      process.exit(0);
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+    
   } catch (err) {
     console.error('[SERVER] Failed to start:', err);
     process.exit(1);

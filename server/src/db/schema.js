@@ -5,6 +5,8 @@ const initSqlJs = require('sql.js');
 const DB_PATH = path.join(__dirname, '..', '..', 'digiprotect.db');
 
 let db = null;
+let saveTimeout = null;
+const SAVE_DELAY_MS = 2000; // 2 seconds delay
 
 /**
  * Initialize the sql.js database. Must be called once at startup (async).
@@ -114,8 +116,29 @@ function initSchema() {
 
 /**
  * Save the database to disk. Call after write operations.
+ * Debounced to prevent thrashing the disk on concurrent writes.
  */
-function saveDb() {
+function saveDb(force = false) {
+  if (!db) return;
+  
+  if (force) {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    _performSave();
+    return;
+  }
+
+  if (!saveTimeout) {
+    saveTimeout = setTimeout(() => {
+      saveTimeout = null;
+      _performSave();
+    }, SAVE_DELAY_MS);
+  }
+}
+
+function _performSave() {
   if (db) {
     const data = db.export();
     const buffer = Buffer.from(data);
@@ -128,7 +151,7 @@ function saveDb() {
  */
 function closeDb() {
   if (db) {
-    saveDb();
+    saveDb(true);
     db.close();
     db = null;
   }

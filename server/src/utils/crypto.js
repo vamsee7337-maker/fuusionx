@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const { pipeline } = require('stream/promises');
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16; // 128-bit IV for GCM
@@ -58,4 +60,49 @@ function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
-module.exports = { encryptBuffer, decryptBuffer, sha256 };
+/**
+ * Encrypt a read stream to a file AND compute SHA-256 hash.
+ * Returns { iv, authTag, sha256 } as hex strings.
+ */
+async function encryptStreamAndHash(readStream, writePath) {
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  const hash = crypto.createHash('sha256');
+  
+  const writeStream = fs.createWriteStream(writePath);
+
+  return new Promise((resolve, reject) => {
+    readStream.on('data', (chunk) => {
+      hash.update(chunk);
+    });
+    
+    pipeline(readStream, cipher, writeStream)
+      .then(() => {
+        resolve({
+          iv: iv.toString('hex'),
+          authTag: cipher.getAuthTag().toString('hex'),
+          sha256: hash.digest('hex')
+        });
+      })
+      .catch(reject);
+  });
+}
+
+/**
+ * Decrypt a file stream to a response/write stream.
+ */
+async function decryptStream(readPath, writeStream, ivHex, authTagHex) {
+  const key = getEncryptionKey();
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+  
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(authTag);
+  
+  const readStream = fs.createReadStream(readPath);
+  
+  await pipeline(readStream, decipher, writeStream);
+}
+
+module.exports = { encryptBuffer, decryptBuffer, sha256, encryptStreamAndHash, decryptStream };
